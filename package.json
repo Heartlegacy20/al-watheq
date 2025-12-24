@@ -12,8 +12,9 @@
     "react": "latest",
     "react-dom": "latest",
     "@supabase/supabase-js": "latest",
-    "openai": "latest"
+    "openai": "latest",
     "recharts": "^2.10.3"
   }
 
 }
+
