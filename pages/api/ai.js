@@ -1,54 +1,73 @@
 import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
 
-// إعداد العملاء باستخدام المفاتيح التي وضعتها في Vercel
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+// 1. إعداد الاتصال بـ Supabase و OpenAI
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
+const openai = new OpenAI({ 
+  apiKey: process.env.OPENAI_API_KEY 
+})
 
 export default async function handler(req, res) {
-  // 1. تسجيل أن هناك اتصالاً قد وصل (سيظهر في Logs)
-  console.log("!!! اتصال جديد وصل من WhatsApp !!!");
-  console.log("بيانات الطلب:", req.body);
+  // تسجيل وصول الطلب في Logs Vercel للتأكد من الربط
+  console.log("--- تم استقبال طلب جديد من Twilio ---");
 
+  // السماح فقط بطلبات POST (التي يرسلها تويلي)
   if (req.method !== 'POST') {
-    return res.status(405).send('Method Not Allowed');
+    console.log("خطأ: تم استقبال طلب ليس من نوع POST");
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
   try {
-    // 2. استخراج الرسالة ورقم المرسل من تويلي
-    const body = req.body;
-    const message = body.Body;
-    const sender = body.From;
+    // 2. استخراج البيانات من Twilio (تصل بصيغة Form Data)
+    const { Body, From } = req.body;
+    
+    console.log("المرسل:", From);
+    console.log("الرسالة:", Body);
 
-    // 3. تحليل سريع بالـ AI
+    // 3. الحصول على رد من ذكاء OpenAI الاصطناعي
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
-      messages: [{ role: "user", content: message || "مرحباً" }]
+      messages: [
+        { role: "system", content: "أنت مساعد ذكي لمشروع الواثق، تجيب باختصار ومهنية." },
+        { role: "user", content: Body || "مرحباً" }
+      ]
     });
+    
     const aiReply = completion.choices[0].message.content;
+    console.log("رد الـ AI:", aiReply);
 
-    // 4. حفظ البيانات في Supabase
-    const { error } = await supabase.from('tickets').insert([
-      { 
-        customer_name: sender, 
-        last_message: message, 
-        status: 'automated',
-        ai_tag: 'WhatsApp Live'
-      }
-    ]);
+    // 4. تخزين التذكرة في جدول tickets في Supabase
+    const { data, error: dbError } = await supabase
+      .from('tickets')
+      .insert([
+        { 
+          customer_name: From, 
+          last_message: Body, 
+          status: 'automated',
+          ai_tag: 'WhatsApp' 
+        }
+      ]);
 
-    if (error) console.error("خطأ سوبابيس:", error);
+    if (dbError) {
+      console.error("خطأ في تخزين البيانات في Supabase:", dbError.message);
+    } else {
+      console.log("تم تخزين التذكرة بنجاح في قاعدة البيانات");
+    }
 
-    // 5. الرد الرسمي الذي يفهمه تويلي ليرسله للواتساب
+    // 5. الرد بتنسيق TwiML (الذي يفهمه تويلي لإرساله للواتساب)
     res.setHeader('Content-Type', 'text/xml');
-    return res.status(200).send(`
+    const twimlResponse = `
       <Response>
         <Message>${aiReply}</Message>
       </Response>
-    `);
+    `;
+    return res.status(200).send(twimlResponse);
 
-  } catch (err) {
-    console.error("خطأ شامل في السيرفر:", err);
-    return res.status(500).json({ error: err.message });
+  } catch (error) {
+    console.error("خطأ تقني في المعالجة:", error.message);
+    return res.status(500).send("Internal Server Error");
   }
 }
