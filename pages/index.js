@@ -1,138 +1,153 @@
-import Head from 'next/head'
-import { useEffect, useState } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import Head from 'next/head';
+import { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+// إعداد Supabase
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
+);
 
-export default function EnhancedDashboard() {
-  const [tickets, setTickets] = useState([])
-  const [stats, setStats] = useState({ total: 0, automated: 0, pending: 0 })
+// الدالة الرئيسية لمكون لوحة القيادة
+export default function UltimateDashboard() {
+  const [tickets, setTickets] = useState([]);
+  const [stats, setStats] = useState({ total: 0, automated: 0, pending: 0, today: 0 });
+  const [chartData, setChartData] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const fetchTickets = async () => {
-    const { data, error } = await supabase
+  // جلب البيانات والإحصائيات من Supabase
+  const fetchData = async () => {
+    setLoading(true);
+    const { data: ticketsData, error: ticketsError } = await supabase
       .from('tickets')
       .select('*')
-      .order('id', { ascending: false })
-    
-    if (data) {
-      setTickets(data)
-      // تحديث الإحصائيات بناءً على البيانات الواردة
-      setStats({
-        total: data.length,
-        automated: data.filter(t => t.status === 'تم الرد' || t.status === 'automated').length,
-        pending: data.filter(t => t.status === 'انتظار').length
-      })
+      .order('created_at', { ascending: false }); // ترتيب حسب تاريخ الإنشاء
+
+    if (ticketsError) {
+      console.error("Error fetching tickets:", ticketsError);
+      setLoading(false);
+      return;
     }
-  }
+
+    if (ticketsData) {
+      setTickets(ticketsData);
+
+      // حساب الإحصائيات
+      const today = new Date().toISOString().split('T')[0];
+      const dailyTickets = ticketsData.filter(t => t.created_at.startsWith(today)).length;
+
+      setStats({
+        total: ticketsData.length,
+        automated: ticketsData.filter(t => t.status === 'تم الرد' || t.status === 'automated').length,
+        pending: ticketsData.filter(t => t.status === 'انتظار').length,
+        today: dailyTickets
+      });
+
+      // إعداد بيانات الرسم البياني
+      const dayCounts = ticketsData.reduce((acc, ticket) => {
+        const date = ticket.created_at.split('T')[0];
+        acc[date] = (acc[date] || 0) + 1;
+        return acc;
+      }, {});
+
+      const sortedDates = Object.keys(dayCounts).sort();
+      const chartFormattedData = sortedDates.map(date => ({
+        name: new Date(date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' }),
+        محادثات: dayCounts[date],
+      }));
+      setChartData(chartFormattedData);
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
-    fetchTickets()
-    const interval = setInterval(fetchTickets, 4000) // تحديث سريع كل 4 ثوانٍ
-    return () => clearInterval(interval)
-  }, [])
+    fetchData();
+    const interval = setInterval(fetchData, 7000); // تحديث كل 7 ثوانٍ
+    return () => clearInterval(interval);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] font-sans text-right" dir="rtl">
+    <div className="min-h-screen bg-gray-900 text-white font-sans overflow-hidden relative" dir="rtl">
       <Head>
-        <title>الواثق | لوحة التحكم الذكية</title>
+        <title>الواثق | لوحة التحكم المتكاملة</title>
         <script src="https://cdn.tailwindcss.com"></script>
+        {/* رابط الخطوط إذا أردت خطوطا معينة */}
+        {/* <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet" /> */}
+        <style>
+          {`
+          /* خلفية متحركة وهمية (CSS Animation) */
+          body {
+            overflow: hidden; /* لمنع ظهور شريط التمرير الناتج عن الخلفية المتحركة */
+          }
+          .background-animation::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, #1f2937, #0f172a, #1f2937, #0f172a);
+            background-size: 200% 200%;
+            animation: moveBackground 30s ease infinite alternate;
+            z-index: -1;
+            opacity: 0.1; /* شفافية بسيطة للخلفية */
+          }
+
+          @keyframes moveBackground {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+          }
+          `}
+        </style>
       </Head>
 
-      {/* الشريط العلوي المحسن */}
-      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 py-4">
+      {/* الخلفية المتحركة (Pseudo-element) */}
+      <div className="absolute inset-0 background-animation"></div>
+
+      {/* الشريط العلوي (Navbar) */}
+      <nav className="sticky top-0 z-50 bg-gray-800/70 backdrop-blur-sm border-b border-gray-700 px-8 py-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <div className="bg-blue-600 p-2 rounded-lg shadow-lg shadow-blue-200">
-              <span className="text-white font-black">W</span>
+          <div className="flex items-center gap-3">
+            {/* شعار الواثق */}
+            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30">
+              <span className="text-white text-xl font-black">W</span>
             </div>
-            <h1 className="text-xl font-bold text-slate-800 tracking-tight">الواثق <span className="text-blue-600 text-sm font-normal">CRM</span></h1>
+            <h1 className="text-2xl font-extrabold text-white tracking-wide">الواثق <span className="text-blue-400 text-base font-medium">| لوحة قيادة CRM</span></h1>
           </div>
-          <div className="flex items-center gap-4 text-slate-500">
-             <div className="flex items-center gap-2 bg-green-50 px-3 py-1 rounded-full">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-ping"></span>
-                <span className="text-xs font-bold text-green-600">النظام متصل</span>
-             </div>
+          <div className="flex items-center gap-6">
+            <span className="text-sm font-medium text-gray-400">مرحباً بك، المدير!</span>
+            <div className="flex items-center gap-2 bg-green-700/30 px-4 py-2 rounded-full border border-green-600">
+                <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></span>
+                <span className="text-sm font-bold text-green-300">النظام متصل</span>
+            </div>
+            <button className="bg-red-600 text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-red-700 transition">
+              تسجيل الخروج
+            </button>
           </div>
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto p-6 md:p-10">
+      {/* المحتوى الرئيسي */}
+      <main className="relative z-10 max-w-7xl mx-auto p-6 md:p-10">
         
-        {/* قسم الإحصائيات السريعة */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 transition-transform hover:scale-105">
-            <p className="text-slate-400 text-sm font-medium">إجمالي المحادثات</p>
-            <h3 className="text-3xl font-black text-slate-800 mt-1">{stats.total}</h3>
-          </div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 border-r-4 border-r-blue-500 transition-transform hover:scale-105">
-            <p className="text-slate-400 text-sm font-medium">تم الرد عليها آلياً</p>
-            <h3 className="text-3xl font-black text-blue-600 mt-1">{stats.automated}</h3>
-          </div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 border-r-4 border-r-amber-500 transition-transform hover:scale-105">
-            <p className="text-slate-400 text-sm font-medium">بانتظار المراجعة</p>
-            <h3 className="text-3xl font-black text-amber-600 mt-1">{stats.pending}</h3>
-          </div>
+        {/* البطاقات الإحصائية */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+          <Card title="إجمالي المحادثات" value={stats.total} color="blue" icon="💬" loading={loading} />
+          <Card title="محادثات اليوم" value={stats.today} color="green" icon="☀️" loading={loading} />
+          <Card title="تم الرد آلياً" value={stats.automated} color="purple" icon="🤖" loading={loading} />
+          <Card title="بانتظار المراجعة" value={stats.pending} color="yellow" icon="⚠️" loading={loading} />
         </div>
 
-        {/* الجدول التفاعلي المحسن */}
-        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
-          <div className="p-6 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
-            <h2 className="text-lg font-bold text-slate-700">المحادثات المباشرة</h2>
-            <button className="text-blue-600 text-sm font-bold hover:underline">تحميل التقرير</button>
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="text-slate-400 text-xs font-bold text-right border-b border-slate-50">
-                  <th className="p-6">العميل</th>
-                  <th className="p-6">آخر رسالة من WhatsApp</th>
-                  <th className="p-6 text-center">التصنيف الذكي</th>
-                  <th className="p-6 text-center">حالة الرد</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {tickets.map((ticket) => (
-                  <tr key={ticket.id} className="group hover:bg-blue-50/30 transition-all">
-                    <td className="p-6 flex items-center gap-3">
-                      <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-bold text-xs group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
-                        {ticket.customer_name?.slice(-2)}
-                      </div>
-                      <span className="font-bold text-slate-700 text-sm">{ticket.customer_name}</span>
-                    </td>
-                    <td className="p-6 text-slate-600 text-sm italic max-w-md">
-                      {ticket.last_message || "—"}
-                    </td>
-                    <td className="p-6 text-center">
-                      <span className="bg-slate-100 text-slate-600 py-1 px-3 rounded-md text-[10px] font-black tracking-widest uppercase">
-                        {ticket.ai_tag || 'عام'}
-                      </span>
-                    </td>
-                    <td className="p-6 text-center">
-                      <div className={`inline-flex items-center gap-1.5 py-1 px-3 rounded-full text-xs font-bold ${
-                        ticket.status === 'تم الرد' || ticket.status === 'automated' 
-                        ? 'bg-green-100 text-green-700' 
-                        : 'bg-amber-100 text-amber-700'
-                      }`}>
-                        {ticket.status === 'تم الرد' || ticket.status === 'automated' ? '✅ ذكي' : '🕒 انتظار'}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {tickets.length === 0 && (
-              <div className="p-20 text-center flex flex-col items-center">
-                <div className="w-16 h-16 bg-slate-50 rounded-full mb-4 animate-bounce flex items-center justify-center">📥</div>
-                <p className="text-slate-400 font-medium">بانتظار استقبال أول طلب مكملات غذائية...</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </main>
-    </div>
-  )
-}
+        {/* قسم الرسم البياني والجدول */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* الرسم البياني */}
+          <div className="lg:col-span-2 bg-gray-800 rounded-3xl p-6 shadow-xl shadow-gray-900/40 border border-gray-700 backdrop-blur-sm">
+            <h2 className="text-xl font-bold text-white mb-6">نشاط المحادثات اليومي</h2>
+            {loading ? (
+              <div className="h-64 flex items-center justify-center text-gray-500">جاري تحميل الرسم البياني...</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#4a55
