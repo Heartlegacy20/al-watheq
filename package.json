@@ -1,20 +1,20 @@
 {
-  "name": "al-watheq-ai",
-  "version": "1.0.0",
+  "name": "al-watheq-crm",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
-    
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",
     "@supabase/supabase-js": "latest",
     "openai": "latest",
-    "recharts": "^2.10.3"
+    "recharts": "^2.10.3",
+    "lucide-react": "latest"
   }
-
 }
-
