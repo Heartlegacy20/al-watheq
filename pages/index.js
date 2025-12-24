@@ -7,114 +7,132 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
 
-export default function Home() {
+export default function EnhancedDashboard() {
   const [tickets, setTickets] = useState([])
+  const [stats, setStats] = useState({ total: 0, automated: 0, pending: 0 })
 
   const fetchTickets = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('tickets')
       .select('*')
       .order('id', { ascending: false })
-    if (data) setTickets(data)
+    
+    if (data) {
+      setTickets(data)
+      // تحديث الإحصائيات بناءً على البيانات الواردة
+      setStats({
+        total: data.length,
+        automated: data.filter(t => t.status === 'تم الرد' || t.status === 'automated').length,
+        pending: data.filter(t => t.status === 'انتظار').length
+      })
+    }
   }
 
   useEffect(() => {
     fetchTickets()
-    const interval = setInterval(fetchTickets, 5000)
+    const interval = setInterval(fetchTickets, 4000) // تحديث سريع كل 4 ثوانٍ
     return () => clearInterval(interval)
   }, [])
 
   return (
-    <div className="min-h-screen bg-white font-sans text-right" dir="rtl">
+    <div className="min-h-screen bg-[#f8fafc] font-sans text-right" dir="rtl">
       <Head>
-        <title>الواثق | نظام إدارة العملاء الذكي</title>
+        <title>الواثق | لوحة التحكم الذكية</title>
         <script src="https://cdn.tailwindcss.com"></script>
       </Head>
 
-      {/* القسم الأول: الهوية والترحيب (من الواجهة السابقة) */}
-      <nav className="p-6 flex justify-between items-center max-w-7xl mx-auto">
-        <div className="text-2xl font-bold text-blue-600">💡 الواثق</div>
-        <div className="hidden md:flex gap-8 text-gray-600 font-medium">
-          <a href="#" className="hover:text-blue-600">الرئيسية</a>
-          <a href="#" className="hover:text-blue-600">التقارير</a>
-          <a href="#" className="hover:text-blue-600">الإعدادات</a>
+      {/* الشريط العلوي المحسن */}
+      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 py-4">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <div className="bg-blue-600 p-2 rounded-lg shadow-lg shadow-blue-200">
+              <span className="text-white font-black">W</span>
+            </div>
+            <h1 className="text-xl font-bold text-slate-800 tracking-tight">الواثق <span className="text-blue-600 text-sm font-normal">CRM</span></h1>
+          </div>
+          <div className="flex items-center gap-4 text-slate-500">
+             <div className="flex items-center gap-2 bg-green-50 px-3 py-1 rounded-full">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-ping"></span>
+                <span className="text-xs font-bold text-green-600">النظام متصل</span>
+             </div>
+          </div>
         </div>
-        <button className="bg-blue-600 text-white px-6 py-2 rounded-full font-bold shadow-lg hover:bg-blue-700 transition">
-          تسجيل الخروج
-        </button>
       </nav>
 
-      <header className="py-12 px-6 text-center bg-gradient-to-b from-blue-50 to-white">
-        <h1 className="text-4xl md:text-6xl font-black text-slate-900 mb-4">
-          مرحباً بك في <span className="text-blue-600">نظام الواثق</span>
-        </h1>
-        <p className="text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
-          هنا يمكنك إدارة جميع محادثات WhatsApp المباشرة ومراقبة أداء الذكاء الاصطناعي في الرد على عملائك.
-        </p>
-      </header>
-
-      {/* القسم الثاني: لوحة البيانات التفاعلية (Dashboard) */}
-      <main className="max-w-6xl mx-auto px-6 pb-20">
-        <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden">
-          <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-bold text-slate-800 tracking-tight">التذاكر والرسائل الحية</h2>
-              <p className="text-slate-500 text-sm mt-1">يتم التحديث تلقائياً من Supabase</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
-              <span className="text-sm font-bold text-green-600 italic">مباشر الآن</span>
-            </div>
+      <main className="max-w-7xl mx-auto p-6 md:p-10">
+        
+        {/* قسم الإحصائيات السريعة */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 transition-transform hover:scale-105">
+            <p className="text-slate-400 text-sm font-medium">إجمالي المحادثات</p>
+            <h3 className="text-3xl font-black text-slate-800 mt-1">{stats.total}</h3>
           </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 border-r-4 border-r-blue-500 transition-transform hover:scale-105">
+            <p className="text-slate-400 text-sm font-medium">تم الرد عليها آلياً</p>
+            <h3 className="text-3xl font-black text-blue-600 mt-1">{stats.automated}</h3>
+          </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 border-r-4 border-r-amber-500 transition-transform hover:scale-105">
+            <p className="text-slate-400 text-sm font-medium">بانتظار المراجعة</p>
+            <h3 className="text-3xl font-black text-amber-600 mt-1">{stats.pending}</h3>
+          </div>
+        </div>
 
+        {/* الجدول التفاعلي المحسن */}
+        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
+          <div className="p-6 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
+            <h2 className="text-lg font-bold text-slate-700">المحادثات المباشرة</h2>
+            <button className="text-blue-600 text-sm font-bold hover:underline">تحميل التقرير</button>
+          </div>
+          
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-slate-50 text-slate-500 text-sm uppercase">
-                  <th className="p-6 text-right font-bold">العميل</th>
-                  <th className="p-6 text-right font-bold">آخر رسالة</th>
-                  <th className="p-6 text-center font-bold">الحالة</th>
-                  <th className="p-6 text-center font-bold">التصنيف</th>
+                <tr className="text-slate-400 text-xs font-bold text-right border-b border-slate-50">
+                  <th className="p-6">العميل</th>
+                  <th className="p-6">آخر رسالة من WhatsApp</th>
+                  <th className="p-6 text-center">التصنيف الذكي</th>
+                  <th className="p-6 text-center">حالة الرد</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-50">
                 {tickets.map((ticket) => (
-                  <tr key={ticket.id} className="hover:bg-blue-50/40 transition-all duration-300">
-                    <td className="p-6">
-                      <div className="font-bold text-slate-900">{ticket.customer_name}</div>
-                      <div className="text-xs text-slate-400">ID: {ticket.id.slice(0,8)}</div>
+                  <tr key={ticket.id} className="group hover:bg-blue-50/30 transition-all">
+                    <td className="p-6 flex items-center gap-3">
+                      <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-bold text-xs group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                        {ticket.customer_name?.slice(-2)}
+                      </div>
+                      <span className="font-bold text-slate-700 text-sm">{ticket.customer_name}</span>
                     </td>
-                    <td className="p-6 text-slate-600 font-medium italic">
-                      {ticket.last_message || "لا توجد رسالة بعد"}
+                    <td className="p-6 text-slate-600 text-sm italic max-w-md">
+                      {ticket.last_message || "—"}
                     </td>
                     <td className="p-6 text-center">
-                      <span className="bg-emerald-100 text-emerald-700 py-1.5 px-4 rounded-full text-xs font-black uppercase">
-                        {ticket.status}
+                      <span className="bg-slate-100 text-slate-600 py-1 px-3 rounded-md text-[10px] font-black tracking-widest uppercase">
+                        {ticket.ai_tag || 'عام'}
                       </span>
                     </td>
                     <td className="p-6 text-center">
-                      <span className="bg-blue-100 text-blue-700 py-1.5 px-4 rounded-full text-xs font-bold">
-                        {ticket.ai_tag || "WhatsApp"}
-                      </span>
+                      <div className={`inline-flex items-center gap-1.5 py-1 px-3 rounded-full text-xs font-bold ${
+                        ticket.status === 'تم الرد' || ticket.status === 'automated' 
+                        ? 'bg-green-100 text-green-700' 
+                        : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {ticket.status === 'تم الرد' || ticket.status === 'automated' ? '✅ ذكي' : '🕒 انتظار'}
+                      </div>
                     </td>
                   </tr>
                 ))}
-                {tickets.length === 0 && (
-                  <tr>
-                    <td colSpan="4" className="p-24 text-center">
-                      <div className="text-slate-300 text-lg">بانتظار استقبال أول رسالة من الواتساب...</div>
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
+            {tickets.length === 0 && (
+              <div className="p-20 text-center flex flex-col items-center">
+                <div className="w-16 h-16 bg-slate-50 rounded-full mb-4 animate-bounce flex items-center justify-center">📥</div>
+                <p className="text-slate-400 font-medium">بانتظار استقبال أول طلب مكملات غذائية...</p>
+              </div>
+            )}
           </div>
         </div>
       </main>
-
-      <footer className="text-center py-10 border-t border-slate-100 text-slate-400 text-sm">
-        جميع الحقوق محفوظة لنظام الواثق © 2025
-      </footer>
     </div>
   )
 }
