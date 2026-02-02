@@ -11,7 +11,7 @@ function SceneBackground({ isAlert }) {
   const group = useRef();
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
-    group.current.rotation.y = t * 0.1; 
+    if (group.current) group.current.rotation.y = t * 0.1;
   });
   return (
     <group ref={group}>
@@ -29,7 +29,7 @@ function SceneBackground({ isAlert }) {
   );
 }
 
-export default function FinalImmersiveApp() {
+export default function App() {
   const [stats, setStats] = useState({ total: 0, automated: 0, active: 0 });
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessage, setChatMessage] = useState("");
@@ -68,7 +68,7 @@ export default function FinalImmersiveApp() {
       const data = await res.json();
       setChatHistory(prev => [...prev, { role: 'ai', content: data.reply }]);
     } catch (error) {
-      setChatHistory(prev => [...prev, { role: 'ai', content: "عذراً، حدث خطأ في الاتصال." }]);
+      setChatHistory(prev => [...prev, { role: 'ai', content: "خطأ في الاتصال." }]);
     } finally {
       setIsLoading(false);
       setTimeout(() => setIsAlert(false), 2000);
@@ -76,10 +76,9 @@ export default function FinalImmersiveApp() {
   };
 
   return (
-    <div className="min-h-screen bg-[#020617] text-white overflow-hidden font-sans" dir="rtl">
-      <Head><title>الواثق AI | Tactical 3D</title></Head>
+    <div className="min-h-screen bg-[#020617] text-white overflow-hidden" dir="rtl">
+      <Head><title>الواثق AI</title></Head>
 
-      {/* 3D Engine Background */}
       <div className="fixed inset-0 z-0">
         <Canvas shadows>
           <PerspectiveCamera makeDefault position={[8, 5, 15]} fov={35} />
@@ -92,6 +91,44 @@ export default function FinalImmersiveApp() {
         </Canvas>
       </div>
 
-      {/* UI Content Layer */}
-      <main className="relative z-10 container mx-auto p-10 pointer-events-none">
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-between items
+      <main className="relative z-10 p-10 pointer-events-none">
+        <div className="bg-white/5 backdrop-blur-xl p-6 rounded-3xl border border-white/10 flex justify-between items-center pointer-events-auto">
+          <h1 className="text-xl font-bold italic">AL-WATHEQ AI</h1>
+          <div className="text-xs font-mono text-blue-400">STATUS: ACTIVE</div>
+        </div>
+      </main>
+
+      <div className="fixed bottom-8 left-8 z-[999] pointer-events-auto">
+        <AnimatePresence>
+          {isChatOpen && (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
+              className="bg-slate-900/95 backdrop-blur-2xl border border-white/10 w-80 h-[400px] mb-4 rounded-3xl flex flex-col overflow-hidden shadow-2xl"
+            >
+              <div className="p-4 bg-blue-600 text-center text-[10px] font-bold tracking-widest uppercase">المساعد الذكي</div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {chatHistory.map((h, i) => (
+                  <div key={i} className={`flex ${h.role === 'user' ? 'justify-start' : 'justify-end'}`}>
+                    <div className={`p-2 rounded-xl text-[10px] ${h.role === 'user' ? 'bg-blue-600' : 'bg-white/10 border border-white/5'}`}>{h.content}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-3 bg-black/40 flex gap-2">
+                <input 
+                  value={chatMessage} onChange={(e) => setChatMessage(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-1 text-[10px] flex-1 outline-none"
+                  placeholder="اسأل الواثق..."
+                />
+                <button onClick={sendMessage} className="bg-blue-600 px-3 rounded-lg text-xs">ارسل</button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <button onClick={() => setIsChatOpen(!isChatOpen)} className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-xl">
+          {isChatOpen ? "✕" : "🤖"}
+        </button>
+      </div>
+    </div>
+  );
+}
