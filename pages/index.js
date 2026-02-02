@@ -29,34 +29,18 @@ function SceneBackground({ isAlert }) {
   );
 }
 
-export default function App() {
-  const [stats, setStats] = useState({ total: 0, automated: 0, active: 0 });
+export default function AlWatheqApp() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessage, setChatMessage] = useState("");
   const [chatHistory, setChatHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isAlert, setIsAlert] = useState(false);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const { data } = await supabase.from('tickets').select('*');
-      if (data) {
-        setStats({
-          total: data.length,
-          automated: data.filter(t => t.status === 'تم الرد').length,
-          active: data.filter(t => t.status === 'انتظار' || t.status === 'نشط').length
-        });
-      }
-    };
-    fetchData();
-  }, []);
-
   const sendMessage = async () => {
     if (!chatMessage.trim()) return;
     setIsLoading(true);
     setIsAlert(true);
-    const userMsg = { role: 'user', content: chatMessage };
-    setChatHistory(prev => [...prev, userMsg]);
+    setChatHistory(prev => [...prev, { role: 'user', content: chatMessage }]);
     setChatMessage("");
 
     try {
@@ -76,10 +60,15 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#020617] text-white overflow-hidden" dir="rtl">
-      <Head><title>الواثق AI</title></Head>
+    <div className="min-h-screen bg-[#020617] text-white overflow-hidden relative" dir="rtl">
+      <Head>
+        <title>الواثق AI | Tactical System</title>
+        {/* هذا الرابط سيصلح كل مشاكل التصميم فوراً */}
+        <script src="https://cdn.tailwindcss.com"></script>
+      </Head>
 
-      <div className="fixed inset-0 z-0">
+      {/* محرك الـ 3D - خلفية كاملة */}
+      <div className="absolute inset-0 z-0 bg-[#020617]">
         <Canvas shadows>
           <PerspectiveCamera makeDefault position={[8, 5, 15]} fov={35} />
           <Suspense fallback={null}>
@@ -91,41 +80,48 @@ export default function App() {
         </Canvas>
       </div>
 
-      <main className="relative z-10 p-10 pointer-events-none">
-        <div className="bg-white/5 backdrop-blur-xl p-6 rounded-3xl border border-white/10 flex justify-between items-center pointer-events-auto">
-          <h1 className="text-xl font-bold italic">AL-WATHEQ AI</h1>
-          <div className="text-xs font-mono text-blue-400">STATUS: ACTIVE</div>
+      {/* واجهة المستخدم الطافية */}
+      <nav className="relative z-10 p-8 flex justify-between items-center bg-black/40 backdrop-blur-md border-b border-white/10">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center font-black italic shadow-lg shadow-blue-500/20">W</div>
+          <h1 className="text-xl font-black tracking-tighter uppercase italic">AL-WATHEQ AI</h1>
         </div>
-      </main>
+        <div className="px-4 py-1 rounded-full border border-blue-500/30 text-[10px] font-bold text-blue-400 bg-blue-500/5 uppercase tracking-widest animate-pulse">
+          Status: Tactical Active
+        </div>
+      </nav>
 
-      <div className="fixed bottom-8 left-8 z-[999] pointer-events-auto">
+      {/* زر الدردشة والنافذة */}
+      <div className="fixed bottom-10 left-10 z-[100]">
         <AnimatePresence>
           {isChatOpen && (
             <motion.div 
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
-              className="bg-slate-900/95 backdrop-blur-2xl border border-white/10 w-80 h-[400px] mb-4 rounded-3xl flex flex-col overflow-hidden shadow-2xl"
+              initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-[#0f172a]/95 backdrop-blur-2xl border border-white/10 w-80 h-[450px] mb-6 rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)]"
             >
-              <div className="p-4 bg-blue-600 text-center text-[10px] font-bold tracking-widest uppercase">المساعد الذكي</div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              <div className="p-5 bg-blue-600/20 border-b border-white/5 text-center text-[10px] font-bold tracking-widest text-blue-400">AI TACTICAL ASSISTANT</div>
+              <div className="flex-1 overflow-y-auto p-5 space-y-4">
                 {chatHistory.map((h, i) => (
                   <div key={i} className={`flex ${h.role === 'user' ? 'justify-start' : 'justify-end'}`}>
-                    <div className={`p-2 rounded-xl text-[10px] ${h.role === 'user' ? 'bg-blue-600' : 'bg-white/10 border border-white/5'}`}>{h.content}</div>
+                    <div className={`p-3 rounded-2xl text-[11px] leading-relaxed max-w-[85%] ${h.role === 'user' ? 'bg-blue-600 shadow-lg' : 'bg-white/5 border border-white/10'}`}>
+                      {h.content}
+                    </div>
                   </div>
                 ))}
               </div>
-              <div className="p-3 bg-black/40 flex gap-2">
+              <div className="p-4 bg-black/40 flex gap-2">
                 <input 
                   value={chatMessage} onChange={(e) => setChatMessage(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-1 text-[10px] flex-1 outline-none"
                   placeholder="اسأل الواثق..."
+                  className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-[11px] flex-1 outline-none focus:border-blue-500 transition-all"
                 />
-                <button onClick={sendMessage} className="bg-blue-600 px-3 rounded-lg text-xs">ارسل</button>
+                <button onClick={sendMessage} className="bg-blue-600 w-10 h-10 rounded-xl flex items-center justify-center hover:bg-blue-700 transition-all">🤖</button>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
-        <button onClick={() => setIsChatOpen(!isChatOpen)} className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-xl">
+        <button onClick={() => setIsChatOpen(!isChatOpen)} className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center shadow-2xl hover:scale-110 transition-transform">
           {isChatOpen ? "✕" : "🤖"}
         </button>
       </div>
