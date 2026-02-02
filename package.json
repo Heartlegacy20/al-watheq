@@ -11,13 +11,12 @@
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "three": "^0.150.0",
+    "@react-three/fiber": "^8.0.0",
+    "@react-three/drei": "^9.0.0",
+    "framer-motion": "^10.0.0",
     "@supabase/supabase-js": "latest",
     "openai": "latest",
     "recharts": "^2.10.3"
-    "@react-three/drei": "^9.0.0",
-"@react-three/fiber": "^8.0.0",
-"framer-motion": "^10.0.0",
-"three": "^0.150.0"
   }
 }
-
