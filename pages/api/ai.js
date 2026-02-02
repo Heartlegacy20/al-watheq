@@ -5,45 +5,62 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 export default async function handler(req, res) {
-  if (req.method === 'GET') {
-    return res.status(200).send("الواثق AI API يعمل بنجاح!");
-  }
-
   if (req.method === 'POST') {
-    const { Body, From } = req.body; // Body هو نص رسالة العميل
+    const { Body, From } = req.body;
 
     try {
-      // 1. استدعاء الذكاء الاصطناعي لتحليل الرسالة والرد عليها
-      const aiResponse = await openai.chat.completions.create({
+      // 1. جلب تعليمات الشركة (المرونة)
+      const { data: config } = await supabase.from('settings').select('instructions').single();
+      
+      // 2. إرسال الرسالة للـ AI مع تفعيل ميزة "الوظائف" (Functions)
+      const response = await openai.chat.completions.create({
         model: "gpt-4-turbo-preview",
         messages: [
-          { 
-            role: "system", 
-            content: "أنت المساعد الذكي لنظام الواثق. وظيفتك الرد على العملاء بلباقة، حجز مواعيد إذا طلبوا ذلك، وتصنيف طلباتهم. أنت تمثل شركة (ضع اسم الشركة هنا)." 
-          },
+          { role: "system", content: config.instructions || "أنت مساعد ذكي عام." },
           { role: "user", content: Body }
         ],
+        tools: [{
+          type: "function",
+          function: {
+            name: "create_appointment",
+            description: "حجز موعد للعميل في قاعدة البيانات",
+            parameters: {
+              type: "object",
+              properties: {
+                date: { type: "string", description: "التاريخ والوقت" },
+                details: { type: "string", description: "تفاصيل الخدمة" }
+              }
+            }
+          }
+        }]
       });
 
-      const replyText = aiResponse.choices[0].message.content;
+      const message = response.choices[0].message;
 
-      // 2. تخزين البيانات في Supabase مع رد الذكاء الاصطناعي
-      await supabase.from('tickets').insert([
-        { 
-          customer_name: From, 
-          last_message: Body, 
-          ai_reply: replyText, // عمود جديد لتخزين رد الـ AI
-          status: 'تم الرد آلياً', 
-          ai_tag: 'AI-Assistant' 
+      // 3. التحقق إذا كان الـ AI قرر "الحجز"
+      if (message.tool_calls) {
+        const action = message.tool_calls[0].function;
+        if (action.name === "create_appointment") {
+          const params = JSON.parse(action.arguments);
+          
+          // تنفيذ الحجز في Supabase
+          await supabase.from('appointments').insert([
+            { customer_name: From, date: params.date, service: params.details }
+          ]);
+
+          return res.status(200).json({ reply: `تمت جدولة موعدك بنجاح في ${params.date}.` });
         }
+      }
+
+      // 4. إذا كان مجرد سؤال عادي، نخزن الرد ونرسله
+      await supabase.from('tickets').insert([
+        { customer_name: From, last_message: Body, ai_reply: message.content, status: 'تم الرد' }
       ]);
 
-      // 3. إرجاع الرد للعميل (إذا كنت تربطه بواتساب مثلاً)
-      return res.status(200).json({ reply: replyText });
+      return res.status(200).json({ reply: message.content });
 
     } catch (e) {
-      console.error(e);
-      return res.status(500).send("حدث خطأ في معالجة الذكاء الاصطناعي");
+      return res.status(500).json({ error: e.message });
     }
   }
 }
