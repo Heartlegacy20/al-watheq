@@ -5,62 +5,91 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 export default async function handler(req, res) {
+  // للتعامل مع الطلبات من الواجهة الأمامية (Chat Widget)
+  if (req.method === 'GET') {
+    return res.status(200).send("الواثق AI Assistant جاهز للعمل!");
+  }
+
   if (req.method === 'POST') {
     const { Body, From } = req.body;
 
     try {
-      // 1. جلب تعليمات الشركة (المرونة)
-      const { data: config } = await supabase.from('settings').select('instructions').single();
-      
-      // 2. إرسال الرسالة للـ AI مع تفعيل ميزة "الوظائف" (Functions)
+      // 1. جلب تعليمات الشركة (المرونة التي طلبتها)
+      const { data: config, error: configError } = await supabase
+        .from('settings')
+        .select('instructions')
+        .single();
+
+      if (configError) console.error("لم يتم العثور على إعدادات الشركة، سيتم استخدام الرد الافتراضي.");
+
+      // 2. إرسال الرسالة للـ AI مع تفعيل ميزة "الوظائف" (Tools)
       const response = await openai.chat.completions.create({
         model: "gpt-4-turbo-preview",
         messages: [
-          { role: "system", content: config.instructions || "أنت مساعد ذكي عام." },
+          { 
+            role: "system", 
+            content: config?.instructions || "أنت مساعد ذكي لنظام الواثق. أجب باختصار ولباقة." 
+          },
           { role: "user", content: Body }
         ],
         tools: [{
           type: "function",
           function: {
             name: "create_appointment",
-            description: "حجز موعد للعميل في قاعدة البيانات",
+            description: "حجز موعد جديد للعميل في قاعدة البيانات",
             parameters: {
               type: "object",
               properties: {
-                date: { type: "string", description: "التاريخ والوقت" },
-                details: { type: "string", description: "تفاصيل الخدمة" }
-              }
+                date: { type: "string", description: "التاريخ والوقت المطلوب للحجز" },
+                details: { type: "string", description: "نوع الخدمة أو تفاصيل إضافية" }
+              },
+              required: ["date"]
             }
           }
-        }]
+        }],
+        tool_choice: "auto"
       });
 
-      const message = response.choices[0].message;
+      const aiMessage = response.choices[0].message;
 
-      // 3. التحقق إذا كان الـ AI قرر "الحجز"
-      if (message.tool_calls) {
-        const action = message.tool_calls[0].function;
-        if (action.name === "create_appointment") {
-          const params = JSON.parse(action.arguments);
+      // 3. معالجة طلب الحجز إذا قرر الـ AI ذلك
+      if (aiMessage.tool_calls) {
+        const toolCall = aiMessage.tool_calls[0];
+        if (toolCall.function.name === "create_appointment") {
+          const params = JSON.parse(toolCall.function.arguments);
           
-          // تنفيذ الحجز في Supabase
-          await supabase.from('appointments').insert([
-            { customer_name: From, date: params.date, service: params.details }
+          // تنفيذ الحجز في جدول appointments
+          const { error: insertError } = await supabase.from('appointments').insert([
+            { 
+              customer_name: From || "عميل موقع", 
+              date: params.date, 
+              service: params.details || "غير محدد" 
+            }
           ]);
 
-          return res.status(200).json({ reply: `تمت جدولة موعدك بنجاح في ${params.date}.` });
+          if (insertError) throw new Error("فشل الحجز في قاعدة البيانات");
+
+          return res.status(200).json({ 
+            reply: `تم تأكيد حجزك بنجاح في تاريخ ${params.date}. يسعدنا خدمتك!` 
+          });
         }
       }
 
-      // 4. إذا كان مجرد سؤال عادي، نخزن الرد ونرسله
+      // 4. إذا كان سؤالاً عادياً، نخزن المحادثة في جدول tickets لمراقبتها من الـ Dashboard
       await supabase.from('tickets').insert([
-        { customer_name: From, last_message: Body, ai_reply: message.content, status: 'تم الرد' }
+        { 
+          customer_name: From || "زائر الموقع", 
+          last_message: Body, 
+          ai_reply: aiMessage.content, 
+          status: 'تم الرد' 
+        }
       ]);
 
-      return res.status(200).json({ reply: message.content });
+      return res.status(200).json({ reply: aiMessage.content });
 
     } catch (e) {
-      return res.status(500).json({ error: e.message });
+      console.error("خطأ في المساعد الذكي:", e.message);
+      return res.status(500).json({ error: "حدث خطأ فني، حاول مرة أخرى لاحقاً." });
     }
   }
 }
